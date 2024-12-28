@@ -46,12 +46,7 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
 
 COPY --chmod=644 workflows/ /ComfyUI/pysssss-workflows/
 COPY --chmod=644 comfy.settings.json /ComfyUI/user/default/comfy.settings.json
-COPY --chmod=644 character_sheet_example.png /ComfyUI/input/character_sheet_example.png
-COPY --chmod=644 example_photo.png /ComfyUI/input/example_photo.png
 COPY --chmod=644 example_photo_small.png /ComfyUI/input/example_photo_small.png
-COPY --chmod=644 example_pose.png /ComfyUI/input/example_pose.png
-COPY --chmod=644 example2.png /ComfyUI/input/example2.png
-COPY --chmod=644 driving_video.mp4 /ComfyUI/input/driving_video.mp4
 
 WORKDIR /workspace
 
@@ -60,22 +55,11 @@ EXPOSE 8188
 # Download and move flux_dev_example.png
 RUN wget "https://github.com/comfyanonymous/ComfyUI_examples/blob/master/flux/flux_dev_example.png" -P /ComfyUI
 
-# Install Xlabs-AI/flux-RealismLora
-RUN apt-get install -y libgl1-mesa-glx libglib2.0-0
-RUN cd /ComfyUI/custom_nodes && \
-    git clone https://github.com/XLabs-AI/x-flux-comfyui.git && \
-    cd x-flux-comfyui && \
-    python3 setup.py
-
 # This is a hacky way to change the default workflow on startup, but it works
 COPY --chmod=644 defaultGraph.json /defaultGraph.json
 COPY --chmod=755 replaceDefaultGraph.py /replaceDefaultGraph.py
 # Run the Python script
 RUN python3 /replaceDefaultGraph.py
-
-# Add Jupyter Notebook
-RUN pip3 install jupyterlab
-EXPOSE 8888
 
 # Add some additional custom nodes
 # LDSR Upscale
@@ -230,5 +214,26 @@ RUN cd / && \
 COPY --chmod=644 ai-toolkit/train_lora.yaml /ai-toolkit/config/train_lora.yaml
 COPY --chmod=755 ai-toolkit/caption_images.py /caption_images.py
 EXPOSE 7860
+
+
+# ------------------- FLUX -------------------
+# Due to the fact that the models are in a gated repository, we need to download them separately BEFORE building this image and store them locally in a folder called flux
+# https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/ae.sft
+COPY flux/ae.sft /ComfyUI/models/vae/
+# https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/flux1-dev.sft
+COPY flux/flux1-dev.sft /ComfyUI/models/diffusion_models/
+
+# Download and move clip_l.safetensors
+RUN wget -O /ComfyUI/models/clip/clip_l.safetensors "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true" --progress=bar:force:noscroll
+
+# Download and move t5xxl_fp16.safetensors
+RUN wget -O /ComfyUI/models/clip/t5xxl_fp8_e4m3fn.safetensors "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" --progress=bar:force:noscroll
+
+# Download LoRas
+RUN mkdir -p /ComfyUI/models/xlabs/loras
+RUN wget -O /ComfyUI/models/loras/VideoAditor_flux_realism_lora.safetensors "https://huggingface.co/VideoAditor/Flux-Lora-Realism/resolve/main/flux_realism_lora.safetensors?download=true" --progress=bar:force:noscroll
+RUN wget -O /ComfyUI/models/loras/flux_face_v0.safetensors "https://storage.googleapis.com/fal-flux-lora/0a62264292fa44e8940d4a7b546bf021_pytorch_lora_weights.safetensors" --progress=bar:force:noscroll
+RUN wget -O /ComfyUI/models/loras/flux_photo_v6.safetensors "https://civitai.com/api/download/models/1022233?type=Model&format=SafeTensor"
+RUN wget -O /ComfyUI/models/loras/flux_photo_transparent_beta.safetensors "https://civitai.com/api/download/models/1096652?type=Model&format=SafeTensor"
 
 CMD [ "/start.sh" ]
